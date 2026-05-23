@@ -20,22 +20,27 @@ HOVER_THRUST = 40000
 
 
 def hover(i):
-        cf.commander.send_setpoint(0, 0, 0, 50000)
+        cf.commander.send_setpoint(0, 0, 0, 40000)
         time.sleep(0.4)
         for i in range(i):
-            cf.commander.send_setpoint(0, 0, 0 , 40000)
+            cf.commander.send_setpoint(0, 6, 0 , 37500)
             time.sleep(0.4)
             time.sleep(0.1)
         
 
 def land(i):
-        HOVER_THRUST =  37000
+        HOVER_THRUST =  38000
+        
+        cf.commander.send_setpoint(0, -12, 0, HOVER_THRUST)
+        time.sleep(0.6)
         for i in range(i):
             
-            cf.commander.send_setpoint(0,0,0,HOVER_THRUST)
+            cf.commander.send_setpoint(-1,0,0,HOVER_THRUST)
             HOVER_THRUST = HOVER_THRUST - 1000
-            
-            time.sleep(1.5)
+            time.sleep(1.0) 
+        cf.commander.send_setpoint(-1,0,0,45000)
+        time.sleep(0.2)
+          
 cflib.crtp.init_drivers()
 
 
@@ -55,9 +60,9 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         print("Taking off...")
         cf.commander.send_setpoint(0, 0, 0, 0)
         time.sleep(0.1)
-        hover(10)
+        hover(6)
         print("landing starting")
-        land(8)
+        land(6)
         
         cf.commander.send_stop_setpoint()
         cf.commander.send_notify_setpoint_stop()
@@ -67,7 +72,7 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
 
     except KeyboardInterrupt:
         print("\nFlight interrupted by user!")
-        land(5)
+        #land(5)
     except Exception as e:
         print(f"Flight logic error caught: {e}")
 
