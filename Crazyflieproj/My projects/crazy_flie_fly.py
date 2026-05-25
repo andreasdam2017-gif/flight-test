@@ -18,6 +18,23 @@ uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
 k = None
 HOVER_THRUST = 40000 
+# Forward/right drift: make these more negative in 0.3-0.5 degree steps.
+# Backward/left drift: move them back toward zero, or positive if needed.
+ROLL_SETPOINT_TRIM_DEGREES = 0
+PITCH_SETPOINT_TRIM_DEGREES = -0.5
+TAKEOFF_THRUST = 39500
+HOVER_START_THRUST = 38000
+HOVER_MIN_THRUST = 30000
+HOVER_MAX_THRUST = 52000
+
+
+def send_trimmed_setpoint(roll, pitch, yaw, thrust):
+    cf.commander.send_setpoint(
+        roll + ROLL_SETPOINT_TRIM_DEGREES,
+        pitch + PITCH_SETPOINT_TRIM_DEGREES,
+        yaw,
+        thrust,
+    )
 
 
 def average_baro(samples=50, delay=0.02):
@@ -40,25 +57,26 @@ def log_synch(i):
 
 
 def take_off(i):
-    cf.commander.send_setpoint(0,0,0,0)
+    send_trimmed_setpoint(0, 0, 0, 0)
     time.sleep(0.1)
     for i in range(int(i * 10)):
-        cf.commander.send_setpoint(0,0,0,37000)        
+        send_trimmed_setpoint(0, 0, 0, TAKEOFF_THRUST)
         time.sleep(0.1) 
+
     
 
 def hover(i):
-    roll = 0
-    pitch = 0
+    roll = -1.5
+    pitch = -1
     yaw = 0
-    thrust = 34000
+    thrust = HOVER_START_THRUST
 
     baro_baseline = log_synch(2)
     target_baro = baro_baseline + 0.5
     filtered_baro = crazylogger.latest_baro_asl
 
-    cf.commander.send_setpoint(0,-4,0,30000)
-    time.sleep(0.1) 
+    send_trimmed_setpoint(roll, pitch, yaw, thrust)
+    time.sleep(0.4) 
     for i in range(int(i * 10)):
         latest_baro_asl = crazylogger.latest_baro_asl
         filtered_baro = 0.9 * filtered_baro + 0.1 * latest_baro_asl
@@ -69,19 +87,19 @@ def hover(i):
         elif altitude_error < -0.08:
             thrust -= 50
 
-        thrust = max(30000, min(42000, thrust))
-        cf.commander.send_setpoint(roll,pitch,yaw,thrust)
+        thrust = max(HOVER_MIN_THRUST, min(HOVER_MAX_THRUST, thrust))
+        send_trimmed_setpoint(roll, pitch, yaw, thrust)
         time.sleep(0.1)
 
 
 def land(i):
-        HOVER_THRUST =  38000
+        HOVER_THRUST =  37800
         
-        cf.commander.send_setpoint(0, 0, 0, HOVER_THRUST)
+        send_trimmed_setpoint(0, 0, 0, HOVER_THRUST)
         time.sleep(0.6)
         for i in range(int(i * 10)):
             
-            cf.commander.send_setpoint(0,0,0,HOVER_THRUST)
+            send_trimmed_setpoint(0, 0, 0, HOVER_THRUST)
             HOVER_THRUST = HOVER_THRUST - 100
             time.sleep(0.1) 
         time.sleep(0.2)
@@ -91,13 +109,15 @@ cflib.crtp.init_drivers()
 
 with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
     cf = scf.cf
-    flight_id = new_flight_id()
-    flight_started_at = utc_now()
-    log_configs, log_file = logger(cf)
-    
-    
-
+    flight_id = None
+    flight_started_at = None
+    log_configs = []
+    log_file = None
     try:
+        flight_id = new_flight_id()
+        flight_started_at = utc_now()
+        log_configs, log_file = logger(cf)
+
         print("Arming...")
         
         cf.supervisor.send_arming_request(True)
@@ -106,10 +126,10 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         log_synch(1)
         time.sleep(0.5)
         print("Taking off...")
-        cf.commander.send_setpoint(0,0,0,0)
-       # take_off(1.0)
+        take_off(1)
+        
         time.sleep(0.1)
-        hover(7.0)
+        hover(3.0)
         print("landing starting")
         land(3.0)
         
@@ -132,11 +152,13 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         for log_config, _ in log_configs:
             log_config.stop()
         time.sleep(0.2)
-        log_file.close()
+        if log_file is not None:
+            log_file.close()
         flight_ended_at = utc_now()
 
-        try:
-            saved_count = save_flight_log_to_db(flight_id, flight_started_at, flight_ended_at)
-            print(f"Saved {saved_count} telemetry entries to {DB_PATH} as {flight_id}")
-        except Exception as e:
-            print(f"Telemetry database save failed: {e}")
+        if flight_id is not None:
+            try:
+                saved_count = save_flight_log_to_db(flight_id, flight_started_at, flight_ended_at)
+                print(f"Saved {saved_count} telemetry entries to {DB_PATH} as {flight_id}")
+            except Exception as e:
+                print(f"Telemetry database save failed: {e}")
