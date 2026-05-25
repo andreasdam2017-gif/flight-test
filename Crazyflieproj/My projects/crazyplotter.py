@@ -620,13 +620,13 @@ def main():
     calculate_stability_efficiency(stab_df)
     plot_flight_story_dashboard(stab_df, gyro_df, acc_df, motor_df, rpm_df, baro_df, battery_df)
 
-    if SHOW_INDIVIDUAL_ACTUATOR_PLOTS:
-        plot_individual_actuator_output(motor_df, rpm_df)
+    
+    plot_individual_actuator_output(motor_df, rpm_df)
 
     plot_baro_environment(baro_df)
 
-    if SHOW_OPTIONAL_PITCH_BY_ROLL:
-        plot_pitch_by_roll(stab_df)
+    
+    plot_pitch_by_roll(stab_df)
 
     plt.show()
 

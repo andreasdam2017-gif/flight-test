@@ -15,7 +15,7 @@ dname = os.path.dirname(abspath)
 os.chdir(dname)
 uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 current_battery = 100
-
+latest_baro_asl = 0
 def motor_log_var():
     log_motor = LogConfig(name='MotorLog', period_in_ms=10)
     log_rpm = LogConfig(name='RPMLog', period_in_ms=10)
@@ -42,7 +42,7 @@ def gyro_log_var():
     log_gyro.add_variable('gyro.z','float')
     return log_gyro
 def baro_log_var():
-    log_baro = LogConfig(name='BarometerLog', period_in_ms=100)
+    log_baro = LogConfig(name='BarometerLog', period_in_ms=10)
     log_baro.add_variable('baro.asl','float') #altitude above sea level
     log_baro.add_variable('baro.pressure','float')#airpressure
     log_baro.add_variable('baro.temp','float') 
@@ -84,11 +84,14 @@ def logger(cf):
         f.write("\n")
 
     def stab_callback(timestamp, stab_data, logconf):
+        global latest_baro_asl
         entry = {
             "timestamp_ms": timestamp,
             "log": logconf.name,
             "data": stab_data
         }
+        if 'baro.asl' in stab_data:
+            latest_baro_asl = stab_data['baro.asl']
         
         json.dump(entry, f)
         f.write("\n")
