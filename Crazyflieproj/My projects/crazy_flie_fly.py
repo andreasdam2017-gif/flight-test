@@ -2,6 +2,7 @@ import os
 import time
 
 import crazylogger
+from calibration import ESTIMATOR_COMPLEMENTARY, set_estimator
 from crazylogger import logger
 from telemetry_store import DB_PATH, new_flight_id, save_flight_log_to_db, utc_now
 
@@ -20,10 +21,10 @@ k = None
 HOVER_THRUST = 40000 
 # Forward/right drift: make these more negative in 0.3-0.5 degree steps.
 # Backward/left drift: move them back toward zero, or positive if needed.
-ROLL_SETPOINT_TRIM_DEGREES = 0
+ROLL_SETPOINT_TRIM_DEGREES = -1.0
 PITCH_SETPOINT_TRIM_DEGREES = -0.5
-TAKEOFF_THRUST = 39500
-HOVER_START_THRUST = 38000
+TAKEOFF_THRUST = 41500
+HOVER_START_THRUST = 39600
 HOVER_MIN_THRUST = 30000
 HOVER_MAX_THRUST = 52000
 
@@ -57,7 +58,7 @@ def log_synch(i):
 
 
 def take_off(i):
-    send_trimmed_setpoint(0, 0, 0, 0)
+    send_trimmed_setpoint(-0.8, 0, 0, 0)
     time.sleep(0.1)
     for i in range(int(i * 10)):
         send_trimmed_setpoint(0, 0, 0, TAKEOFF_THRUST)
@@ -72,7 +73,7 @@ def hover(i):
     thrust = HOVER_START_THRUST
 
     baro_baseline = log_synch(2)
-    target_baro = baro_baseline + 0.5
+    target_baro = baro_baseline + 1.0
     filtered_baro = crazylogger.latest_baro_asl
 
     send_trimmed_setpoint(roll, pitch, yaw, thrust)
@@ -118,6 +119,9 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         flight_started_at = utc_now()
         log_configs, log_file = logger(cf)
 
+        print("Setting estimator...")
+        set_estimator(cf,ESTIMATOR_COMPLEMENTARY)
+
         print("Arming...")
         
         cf.supervisor.send_arming_request(True)
@@ -126,10 +130,11 @@ with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         log_synch(1)
         time.sleep(0.5)
         print("Taking off...")
-        take_off(1)
+        take_off(1.5)
         
         time.sleep(0.1)
-        hover(3.0)
+        print("Hovering")
+        hover(6.0)
         print("landing starting")
         land(3.0)
         
