@@ -15,7 +15,14 @@ dname = os.path.dirname(abspath)
 os.chdir(dname)
 uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 current_battery = 100
+latest_gyro_z = None
 latest_baro_asl = 0
+latest_x = None
+latest_y = None
+latest_vx = None
+latest_vy = None
+latest_yaw = None
+latest_state_timestamp = None
 def motor_log_var():
     log_motor = LogConfig(name='MotorLog', period_in_ms=10)
     log_rpm = LogConfig(name='RPMLog', period_in_ms=10)
@@ -54,7 +61,16 @@ def stab_log_var():
     log_stab.add_variable('stabilizer.pitch', 'float')
     log_stab.add_variable('stabilizer.yaw', 'float')
     return log_stab
+def state_estimate_log_var():
+    log_state = LogConfig(name='StateEstimateLog', period_in_ms=100)
 
+    log_state.add_variable('stateEstimate.x', 'float')
+    log_state.add_variable('stateEstimate.y', 'float')
+    log_state.add_variable('stateEstimate.vx', 'float')
+    log_state.add_variable('stateEstimate.vy', 'float')
+    log_state.add_variable('stateEstimate.yaw', 'float')
+
+    return log_state
 def bat_log_var():
     log_bat = LogConfig(name='BatteryLog', period_in_ms=1000)
     log_bat.add_variable('pm.batteryLevel', 'uint8_t')
@@ -68,6 +84,7 @@ def logger(cf):
     log_gyro = gyro_log_var()
     log_acc = accelo_log_var()
     log_motor, log_rpm = motor_log_var()
+    log_state = state_estimate_log_var()
     
     f = open("logging.jsonl", "w", buffering=1)
 
@@ -84,18 +101,40 @@ def logger(cf):
         f.write("\n")
 
     def stab_callback(timestamp, stab_data, logconf):
-        global latest_baro_asl
+        global latest_baro_asl, latest_x, latest_y
+        global latest_vx, latest_vy, latest_yaw, latest_state_timestamp
+        global latest_gyro_z
+
         entry = {
             "timestamp_ms": timestamp,
             "log": logconf.name,
             "data": stab_data
         }
+        if 'gyro.z' in stab_data:
+            latest_gyro_z = stab_data['gyro.z']
+
+
         if 'baro.asl' in stab_data:
             latest_baro_asl = stab_data['baro.asl']
-        
+
+        if 'stateEstimate.x' in stab_data:
+            latest_x = stab_data['stateEstimate.x']
+            latest_state_timestamp = timestamp
+
+        if 'stateEstimate.y' in stab_data:
+            latest_y = stab_data['stateEstimate.y']
+
+        if 'stateEstimate.vx' in stab_data:
+            latest_vx = stab_data['stateEstimate.vx']
+
+        if 'stateEstimate.vy' in stab_data:
+            latest_vy = stab_data['stateEstimate.vy']
+
+        if 'stateEstimate.yaw' in stab_data:
+            latest_yaw = stab_data['stateEstimate.yaw']
+
         json.dump(entry, f)
         f.write("\n")
-
 
     log_configs = [
         (log_bat, battery_callback),
@@ -105,6 +144,7 @@ def logger(cf):
         (log_acc, stab_callback),
         (log_motor, stab_callback),
         (log_rpm, stab_callback),
+         (log_state, stab_callback),
     ]
 
     for log_config, callback in log_configs:
