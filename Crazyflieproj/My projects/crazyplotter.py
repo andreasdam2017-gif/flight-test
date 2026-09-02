@@ -488,6 +488,81 @@ def plot_baro_environment(baro_df):
     fig.tight_layout()
 
 
+def plot_flow_deck_dashboard(state_df, flow_df):
+    state_df = state_df.copy()
+    flow_df = flow_df.copy()
+
+    position_columns = available_columns(
+        state_df, ["stateEstimate.x", "stateEstimate.y"]
+    )
+    velocity_columns = available_columns(
+        state_df, ["stateEstimate.vx", "stateEstimate.vy"]
+    )
+
+    if len(velocity_columns) == 2:
+        state_df["stateEstimate.horizontalSpeed"] = np.hypot(
+            state_df["stateEstimate.vx"], state_df["stateEstimate.vy"]
+        )
+
+    if "range.zrange" in flow_df.columns:
+        # The downward range sensor reports millimetres; 65535 means invalid.
+        valid_range = flow_df["range.zrange"].where(flow_df["range.zrange"] < 65000)
+        flow_df["flow.height"] = valid_range / 1000
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    path_ax, velocity_ax, height_ax, quality_ax = axes.flat
+
+    if len(position_columns) == 2:
+        x = state_df["stateEstimate.x"]
+        y = state_df["stateEstimate.y"]
+        path_ax.plot(x, y, color="tab:blue", linewidth=1.3)
+        path_ax.scatter(x.iloc[0], y.iloc[0], color="tab:green", label="start", zorder=3)
+        path_ax.scatter(x.iloc[-1], y.iloc[-1], color="tab:red", label="end", zorder=3)
+        path_ax.set_xlabel("X (m)")
+        path_ax.set_ylabel("Y (m)")
+        path_ax.set_aspect("equal", adjustable="datalim")
+        path_ax.set_title("Flow-deck ground track")
+        path_ax.grid(True, alpha=0.3)
+        path_ax.legend(loc="best")
+    else:
+        path_ax.set_title("Flow-deck ground track (no data)")
+        path_ax.axis("off")
+
+    plot_columns(
+        velocity_ax,
+        state_df,
+        [
+            "stateEstimate.vx",
+            "stateEstimate.vy",
+            "stateEstimate.horizontalSpeed",
+        ],
+        "Horizontal velocity",
+        "m/s",
+    )
+    velocity_ax.set_xlabel("Time (s)")
+
+    plot_columns(
+        height_ax,
+        flow_df,
+        ["flow.height"],
+        "Downward range: height above surface",
+        "m",
+    )
+    height_ax.set_xlabel("Time (s)")
+
+    plot_columns(
+        quality_ax,
+        flow_df,
+        ["motion.squal", "motion.deltaX", "motion.deltaY"],
+        "Optical-flow tracking quality and raw motion",
+        "sensor units",
+    )
+    quality_ax.set_xlabel("Time (s)")
+
+    fig.suptitle("Flow Deck Dashboard", fontsize=16)
+    fig.tight_layout(rect=[0, 0, 1, 0.97])
+
+
 def plot_pitch_by_roll(stab_df):
     columns = available_columns(stab_df, ["stabilizer.roll", "stabilizer.pitch"])
     if len(columns) < 2:
@@ -616,6 +691,8 @@ def main():
     rpm_df = get_log_df(df, "RPMLog")
     baro_df = get_log_df(df, "BarometerLog")
     battery_df = get_log_df(df, "BatteryLog")
+    state_df = get_log_df(df, "StateEstimateLog")
+    flow_df = get_log_df(df, "FlowDeckLog")
 
     calculate_stability_efficiency(stab_df)
     plot_flight_story_dashboard(stab_df, gyro_df, acc_df, motor_df, rpm_df, baro_df, battery_df)
@@ -624,6 +701,8 @@ def main():
     plot_individual_actuator_output(motor_df, rpm_df)
 
     plot_baro_environment(baro_df)
+
+    plot_flow_deck_dashboard(state_df, flow_df)
 
     
     plot_pitch_by_roll(stab_df)
