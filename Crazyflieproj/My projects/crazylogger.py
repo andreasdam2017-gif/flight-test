@@ -71,6 +71,13 @@ def state_estimate_log_var():
     log_state.add_variable('stateEstimate.yaw', 'float')
 
     return log_state
+def flow_deck_log_var():
+    log_flow = LogConfig(name='FlowDeckLog', period_in_ms=100)
+    log_flow.add_variable('motion.deltaX', 'int16_t')
+    log_flow.add_variable('motion.deltaY', 'int16_t')
+    log_flow.add_variable('motion.squal', 'uint8_t')
+    log_flow.add_variable('range.zrange', 'uint16_t')
+    return log_flow
 def bat_log_var():
     log_bat = LogConfig(name='BatteryLog', period_in_ms=1000)
     log_bat.add_variable('pm.batteryLevel', 'uint8_t')
@@ -85,6 +92,7 @@ def logger(cf):
     log_acc = accelo_log_var()
     log_motor, log_rpm = motor_log_var()
     log_state = state_estimate_log_var()
+    log_flow = flow_deck_log_var()
     
     f = open("logging.jsonl", "w", buffering=1)
 
@@ -144,7 +152,8 @@ def logger(cf):
         (log_acc, stab_callback),
         (log_motor, stab_callback),
         (log_rpm, stab_callback),
-         (log_state, stab_callback),
+        (log_state, stab_callback),
+        (log_flow, stab_callback),
     ]
 
     for log_config, callback in log_configs:
